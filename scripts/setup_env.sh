@@ -8,6 +8,19 @@
 
 set -euo pipefail
 
+if [ -n "${VIRTUAL_ENV:-}" ]; then
+  echo "ERROR: a venv (${VIRTUAL_ENV}) is already active in this shell."
+  echo "Run 'deactivate', or better, open a brand-new terminal, then rerun this script."
+  echo "(Do NOT 'source' this script - run it as ./scripts/setup_env.sh or bash scripts/setup_env.sh,"
+  echo " otherwise venv activation leaks into your interactive shell across runs.)"
+  exit 1
+fi
+
+# Resolve the true system python3 up front, by absolute path, so later steps
+# (after the venv is activated and PATH is shadowed) can't accidentally re-resolve
+# the wrong interpreter via a bare `python3` lookup.
+SYSTEM_PYTHON3="$(command -v python3)"
+
 VENV_DIR="${HOME}/.venvs/digress"
 PY_VERSION="3.9"
 
@@ -52,7 +65,8 @@ echo "deb [signed-by=/usr/share/keyrings/skewed-keyring.gpg] https://downloads.s
   | sudo tee /etc/apt/sources.list.d/skewed.list > /dev/null
 sudo apt-get update
 sudo apt-get install -y python3-graph-tool g++
-python3 -c 'import graph_tool as gt' \
+echo "Checking with system python3: ${SYSTEM_PYTHON3} ($(${SYSTEM_PYTHON3} --version))"
+"${SYSTEM_PYTHON3}" -c 'import graph_tool as gt' \
   || { echo "graph-tool not importable from system python3 - aborting"; exit 1; }
 
 echo "== [3/6] Creating venv at ${VENV_DIR} with ${PYTHON_BIN} (--system-site-packages)"
@@ -61,7 +75,7 @@ echo "== [3/6] Creating venv at ${VENV_DIR} with ${PYTHON_BIN} (--system-site-pa
 source "${VENV_DIR}/bin/activate"
 
 echo "== [4/6] Checking graph-tool is visible inside the venv"
-SYS_PY_VER="$(python3 --version | awk '{print $2}' | cut -d. -f1,2)"
+SYS_PY_VER="$(${SYSTEM_PYTHON3} --version | awk '{print $2}' | cut -d. -f1,2)"
 if ! python3 -c 'import graph_tool as gt' 2>/tmp/gt_import_error.log; then
   echo
   echo "ERROR: graph-tool is not importable inside the venv. Real error:"
@@ -69,7 +83,7 @@ if ! python3 -c 'import graph_tool as gt' 2>/tmp/gt_import_error.log; then
   cat /tmp/gt_import_error.log
   echo "----------------------------------------------------------------"
   echo "Diagnostics: venv python is $(python3 -c 'import sys; print(sys.executable)')"
-  echo "             system default python3 reports version ${SYS_PY_VER}, venv was built with ${PY_VERSION}"
+  echo "             true system python3 (${SYSTEM_PYTHON3}) is version ${SYS_PY_VER}, venv was built with ${PY_VERSION}"
   echo "pyvenv.cfg:"
   cat "${VENV_DIR}/pyvenv.cfg"
   deactivate
