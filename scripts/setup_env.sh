@@ -62,20 +62,16 @@ source "${VENV_DIR}/bin/activate"
 
 echo "== [4/6] Checking graph-tool is visible inside the venv"
 SYS_PY_VER="$(python3 --version | awk '{print $2}' | cut -d. -f1,2)"
-if ! python -c 'import graph_tool as gt' 2>/dev/null; then
+if ! python3 -c 'import graph_tool as gt' 2>/tmp/gt_import_error.log; then
   echo
-  echo "ERROR: graph-tool is not importable inside the venv."
-  echo "apt installed graph-tool for system python ${SYS_PY_VER}, but this venv runs"
-  echo "python ${PY_VERSION} -- --system-site-packages can only see packages that match"
-  echo "the interpreter's ABI/version, so a mismatched version is invisible to it."
-  echo
-  echo "Fix options:"
-  echo "  a) If ${SYS_PY_VER} is close enough for your needs, rerun this script after"
-  echo "     changing PY_VERSION at the top to \"${SYS_PY_VER}\" (skips the separate"
-  echo "     python${PY_VERSION} install entirely and uses the system interpreter throughout)."
-  echo "  b) Build graph-tool from source against python${PY_VERSION} (slow, needs"
-  echo "     Boost.Python/CGAL/sparsehash/expat - this is exactly what conda-forge"
-  echo "     automates, which is why the authors used conda for this one package)."
+  echo "ERROR: graph-tool is not importable inside the venv. Real error:"
+  echo "----------------------------------------------------------------"
+  cat /tmp/gt_import_error.log
+  echo "----------------------------------------------------------------"
+  echo "Diagnostics: venv python is $(python3 -c 'import sys; print(sys.executable)')"
+  echo "             system default python3 reports version ${SYS_PY_VER}, venv was built with ${PY_VERSION}"
+  echo "pyvenv.cfg:"
+  cat "${VENV_DIR}/pyvenv.cfg"
   deactivate
   exit 1
 fi
